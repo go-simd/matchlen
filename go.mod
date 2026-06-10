@@ -1,3 +1,5 @@
 module github.com/go-simd/matchlen
 
-go 1.20
+go 1.25.0
+
+require golang.org/x/sys v0.46.0

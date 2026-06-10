@@ -1,0 +1,11 @@
+name: bench-amd64
+on:
+  push: { branches: [main] }
+jobs:
+  bench:
+    runs-on: ubuntu-latest # native amd64 (has AVX2)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: stable }
+      - run: go test -run '^$' -bench 'Bulk|MatchLen' -count=4 .

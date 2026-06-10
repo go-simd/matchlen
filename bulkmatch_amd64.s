@@ -4,30 +4,59 @@
 
 #include "textflag.h"
 
-TEXT ·bulkMatch(SB), NOSPLIT, $0-64
+TEXT ·bulkMatchSSE(SB), NOSPLIT, $0-64
 	MOVQ a_base+0(FP), AX
 	MOVQ b_base+24(FP), BX
 	MOVQ limit+48(FP), CX
 	XORQ DI, DI
-loop:
+sloop:
 	LEAQ 16(DI), R8
 	CMPQ R8, CX
-	JGT done
+	JGT sdone
 	MOVOU (AX)(DI*1), X0
 	MOVOU (BX)(DI*1), X1
 	PCMPEQB X1, X0
 	PMOVMSKB X0, R9
 	CMPL R9, $0xFFFF
-	JNE mism
+	JNE smism
 	ADDQ $16, DI
-	JMP loop
-mism:
+	JMP sloop
+smism:
 	NOTL R9
 	BSFL R9, R9
 	ADDQ DI, R9
 	MOVQ R9, ret+56(FP)
 	RET
-done:
+sdone:
+	MOVQ DI, ret+56(FP)
+	RET
+
+TEXT ·bulkMatchAVX2(SB), NOSPLIT, $0-64
+	MOVQ a_base+0(FP), AX
+	MOVQ b_base+24(FP), BX
+	MOVQ limit+48(FP), CX
+	XORQ DI, DI
+vloop:
+	LEAQ 32(DI), R8
+	CMPQ R8, CX
+	JGT vdone
+	VMOVDQU (AX)(DI*1), Y0
+	VMOVDQU (BX)(DI*1), Y1
+	VPCMPEQB Y1, Y0, Y0
+	VPMOVMSKB Y0, R9
+	CMPL R9, $-1
+	JNE vmism
+	ADDQ $32, DI
+	JMP vloop
+vmism:
+	NOTL R9
+	BSFL R9, R9
+	ADDQ DI, R9
+	VZEROUPPER
+	MOVQ R9, ret+56(FP)
+	RET
+vdone:
+	VZEROUPPER
 	MOVQ DI, ret+56(FP)
 	RET
 
