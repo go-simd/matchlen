@@ -51,15 +51,41 @@ n := matchlen.MatchLen(a, b) // a[:n] == b[:n], n maximal
 
 ## Performance
 
-16-byte SIMD strides vs a naive byte loop, ~4 KiB shared prefix (Apple Silicon,
-arm64 NEON): **~34.7 GB/s vs ~3.3 GB/s — ~10x.**
+SIMD `MatchLen` vs the 8-byte-word scalar reference, ~4 KiB shared prefix
+(`-count=6`, medians, **as of 2026-06-14**):
+
+| arch | host | SIMD | scalar ref | speedup |
+|---|---|---|---|---|
+| arm64 | Apple Silicon (native) | ~31.3 GB/s | ~3.0 GB/s | **~10.4x** |
+| amd64 | x86_64 QEMU VM (ratio valid, absolute MB/s low) | — | — | **~10.6x** |
 
 The match-counter alone (native amd64, GitHub runner): SSE2 ~17.6 GB/s, **AVX2
-~36.6 GB/s (~2.08x)** — AVX2 is picked at runtime when available.
+~36.6 GB/s (~2.08x)** — AVX2 is picked at runtime when available. The verdict
+holds: SIMD is ~10x the scalar fallback on both native arches.
 
-ppc64le (VSX) and s390x (vector facility) are **qemu-validated for correctness;
-native perf is pending** — there is no GitHub-hosted POWER or IBM Z runner, and
-qemu's TCG is not cycle-accurate, so no throughput numbers are quoted for them.
+### ppc64le / s390x — llvm-mca cycle-model estimate
+
+> **Static analysis, NOT a hardware measurement; native perf pending real
+> silicon.** There is no GitHub-hosted POWER or IBM Z runner and qemu's TCG is
+> not cycle-accurate, so the only defensible signal is a cycle model. These
+> numbers come from `llvm-mca` (LLVM 22) fed the steady-state (no-match) inner
+> loop translated to LLVM asm syntax. They model the *no-mismatch* iteration —
+> the throughput-determining path — not the data-dependent early-exit tail.
+
+| arch | cpu model | SIMD cyc/iter | SIMD B/cyc | scalar B/cyc | ratio |
+|---|---|---|---|---|---|
+| ppc64le | pwr9 | 3.3 (16 B) | ~4.85 | ~8.0 (8 B / 1.0 cyc) | **~0.6x** |
+| s390x | z14 | 1.2 (16 B) | ~13.3 | ~5.3 (8 B / 1.5 cyc) | **~2.5x** |
+
+Honest read: on the **pwr9 model the VSX path is *not* a win over the scalar
+word loop** — the mask-to-GPR round-trip (`MFVSRD`) plus the two `VSLDOI`/`NOR`/
+`CMP` chains dominate the 16-byte stride, and pwr9 retires the simple 8-byte
+scalar loop at 1 cyc each. On **z14 the vector path is ~2.5x** because
+`VFENEBS` does the find-not-equal in-lane and the only GPR extraction is a single
+`VLGVB`. Caveats: llvm-mca idealizes the frontend (perfect dispatch, no
+branch-mispredict, no cache misses), so these are upper bounds on the kernel's
+compute; it models `VFENEBS`'s condition-code side effect only approximately
+(the CC-setting `vfeneb` form is used). Real POWER/Z silicon may differ.
 
 ## Regenerating
 
