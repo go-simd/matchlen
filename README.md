@@ -38,7 +38,10 @@ bit-identical everywhere (checked vs a byte-by-byte reference and fuzzed).
 
 The Go code is at **100 % statement coverage**, gated in CI on every
 architecture (native amd64 + arm64, and riscv64 + loong64 + ppc64le + s390x
-under QEMU); the build fails below 100 %. Both amd64 dispatch branches (AVX2 and
+under QEMU); the build fails below 100 %. **Six SIMD targets, validated on
+seven architectures:** the portable scalar fallback is additionally proven
+bit-exact on real POWER9 silicon as **ppc64 (big-endian)** — a big-endian
+target distinct from s390x's vector kernel. Both amd64 dispatch branches (AVX2 and
 the SSE fallback) are
 exercised on the native amd64 runner by toggling the feature flag. The coverage
 figure is of the Go code only — the generated `.s` SIMD kernels are not measured
@@ -63,29 +66,34 @@ The match-counter alone (native amd64, GitHub runner): SSE2 ~17.6 GB/s, **AVX2
 ~36.6 GB/s (~2.08x)** — AVX2 is picked at runtime when available. The verdict
 holds: SIMD is ~10x the scalar fallback on both native arches.
 
-### ppc64le / s390x — llvm-mca cycle-model estimate
+### ppc64le — measured on real POWER10
 
-> **Static analysis, NOT a hardware measurement; native perf pending real
-> silicon.** There is no GitHub-hosted POWER or IBM Z runner and qemu's TCG is
-> not cycle-accurate, so the only defensible signal is a cycle model. These
-> numbers come from `llvm-mca` (LLVM 22) fed the steady-state (no-match) inner
-> loop translated to LLVM asm syntax. They model the *no-mismatch* iteration —
-> the throughput-determining path — not the data-dependent early-exit tail.
+Measured on real **POWER10** (ppc64le VSX, [GCC Compile Farm](https://portal.cfarm.net/),
+Go 1.26.4, June 2026): the VSX `MatchLen` runs at **~6.3x the scalar baseline**
+(5320 vs 841 MB/s). This supersedes the earlier llvm-mca pwr9 cycle-model
+estimate — on real POWER10 silicon the VSX path is a clear win over the scalar
+word loop.
+
+### s390x — llvm-mca cycle-model estimate
+
+> **Static analysis, NOT a hardware measurement; native perf still pending real
+> silicon.** There is no GitHub-hosted IBM Z runner and qemu's TCG is not
+> cycle-accurate (s390x is QEMU-validated for correctness only), so the only
+> defensible throughput signal is a cycle model. These numbers come from
+> `llvm-mca` (LLVM 22) fed the steady-state (no-match) inner loop translated to
+> LLVM asm syntax. They model the *no-mismatch* iteration — the
+> throughput-determining path — not the data-dependent early-exit tail.
 
 | arch | cpu model | SIMD cyc/iter | SIMD B/cyc | scalar B/cyc | ratio |
 |---|---|---|---|---|---|
-| ppc64le | pwr9 | 3.3 (16 B) | ~4.85 | ~8.0 (8 B / 1.0 cyc) | **~0.6x** |
-| s390x | z14 | 1.2 (16 B) | ~13.3 | ~5.3 (8 B / 1.5 cyc) | **~2.5x** |
+| s390x | z14 | 1.2 (16 B) | ~13.3 | ~5.3 (8 B / 1.5 cyc) | **~2.5x** (estimate) |
 
-Honest read: on the **pwr9 model the VSX path is *not* a win over the scalar
-word loop** — the mask-to-GPR round-trip (`MFVSRD`) plus the two `VSLDOI`/`NOR`/
-`CMP` chains dominate the 16-byte stride, and pwr9 retires the simple 8-byte
-scalar loop at 1 cyc each. On **z14 the vector path is ~2.5x** because
-`VFENEBS` does the find-not-equal in-lane and the only GPR extraction is a single
+Honest read: on **z14 the vector path is ~2.5x** (estimate) because `VFENEBS`
+does the find-not-equal in-lane and the only GPR extraction is a single
 `VLGVB`. Caveats: llvm-mca idealizes the frontend (perfect dispatch, no
 branch-mispredict, no cache misses), so these are upper bounds on the kernel's
 compute; it models `VFENEBS`'s condition-code side effect only approximately
-(the CC-setting `vfeneb` form is used). Real POWER/Z silicon may differ.
+(the CC-setting `vfeneb` form is used). Real IBM Z silicon may differ.
 
 ## Regenerating
 
