@@ -74,6 +74,16 @@ Go 1.26.4, June 2026): the VSX `MatchLen` runs at **~6.3x the scalar baseline**
 estimate — on real POWER10 silicon the VSX path is a clear win over the scalar
 word loop.
 
+### riscv64 — measured on real SpacemiT X60
+
+Measured on a real **SpacemiT X60** (riscv64 RVV 1.0, [GCC Compile Farm](https://portal.cfarm.net/),
+Go 1.26.4, June 2026): the RVV `MatchLen` runs at **~5.8x the scalar baseline**
+(1236 vs 214 MB/s) — a strong RVV win. Caveat: the X60 is a low-power,
+*in-order* core and is currently the only widely-available RVV 1.0 silicon, so
+absolute MB/s are modest; the ratio is the meaningful signal. On this
+arithmetic/compare-bound kernel RVV wins clearly; an out-of-order RVV core would
+likely lift it further.
+
 ### s390x — llvm-mca cycle-model estimate
 
 > **Static analysis, NOT a hardware measurement; native perf still pending real
