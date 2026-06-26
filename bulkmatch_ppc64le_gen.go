@@ -1,7 +1,10 @@
 //go:build ignore
 
 // Command gen produces bulkmatch_ppc64le.s with go-asmgen: the 16-byte VSX block
-// loop for MatchLen on POWER8+ (VSX is baseline, so no runtime dispatch).
+// loop for MatchLen. The kernel is named bulkMatchVSX and is gated at runtime on
+// POWER9 detection (cpu.PPC64.IsPOWER9) because it scans the compare mask with
+// CNTTZD, an ISA-3.0 (POWER9) instruction that raises SIGILL on POWER8; the Go
+// wrapper falls back to a portable word-at-a-time scalar loop on POWER8.
 //
 // Each iteration loads 16 bytes of a and b with LXVD2X, compares them byte-wise
 // with VCMPEQUB (0xFF where equal, 0x00 where differing), then locates the first
@@ -40,7 +43,7 @@ func main() {
 		[]abi.Arg{abi.Slice("a"), abi.Slice("b"), abi.Scalar("limit", abi.Int64)},
 		[]abi.Arg{abi.Scalar("ret", abi.Int64)},
 	)
-	b := ppc64.NewFunc("bulkMatch", sig, 0)
+	b := ppc64.NewFunc("bulkMatchVSX", sig, 0)
 	b.LoadArg("a_base", "R3").
 		LoadArg("b_base", "R4").
 		LoadArg("limit", "R5").
@@ -52,7 +55,7 @@ func main() {
 		Raw("ADD R3, R6, R8").
 		Raw("LXVD2X (R8), VS32"). // V0 = a[i:i+16]
 		Raw("ADD R4, R6, R9").
-		Raw("LXVD2X (R9), VS33"). // V1 = b[i:i+16]
+		Raw("LXVD2X (R9), VS33").   // V1 = b[i:i+16]
 		Raw("VCMPEQUB V0, V1, V2"). // V2 byte = 0xFF if equal else 0x00
 		// First doubleword (no shift) = memory bytes 0..7.
 		Raw("MFVSRD VS34, R10").  // R10 = compare bytes of the low-address 8

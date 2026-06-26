@@ -4,7 +4,7 @@
 
 #include "textflag.h"
 
-TEXT ·bulkMatch(SB), NOSPLIT, $0-64
+TEXT ·bulkMatchVSX(SB), NOSPLIT, $0-64
 	MOVD a_base+0(FP), R3
 	MOVD b_base+24(FP), R4
 	MOVD limit+48(FP), R5
