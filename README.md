@@ -66,23 +66,30 @@ The match-counter alone (native amd64, GitHub runner): SSE2 ~17.6 GB/s, **AVX2
 ~36.6 GB/s (~2.08x)** — AVX2 is picked at runtime when available. The verdict
 holds: SIMD is ~10x the scalar fallback on both native arches.
 
-### ppc64le — measured on real POWER10
+### ppc64le — measured on real POWER9
 
-Measured on real **POWER10** (ppc64le VSX, [GCC Compile Farm](https://portal.cfarm.net/),
-Go 1.26.4, June 2026): the VSX `MatchLen` runs at **~6.3x the scalar baseline**
+Measured on real **POWER9** (ppc64le VSX, [GCC Compile Farm](https://portal.cfarm.net/),
+Go 1.26.4, 2026-06-26): the VSX `MatchLen` runs at **~6.3x the scalar baseline**
 (5320 vs 841 MB/s). This supersedes the earlier llvm-mca pwr9 cycle-model
-estimate — on real POWER10 silicon the VSX path is a clear win over the scalar
+estimate — on real POWER9 silicon the VSX path is a clear win over the scalar
 word loop.
 
 ### riscv64 — measured on real SpacemiT X60
 
 Measured on a real **SpacemiT X60** (riscv64 RVV 1.0, [GCC Compile Farm](https://portal.cfarm.net/),
-Go 1.26.4, June 2026): the RVV `MatchLen` runs at **~5.8x the scalar baseline**
+Go 1.26.4, 2026-06-26): the RVV `MatchLen` runs at **~5.8x the scalar baseline**
 (1236 vs 214 MB/s) — a strong RVV win. Caveat: the X60 is a low-power,
 *in-order* core and is currently the only widely-available RVV 1.0 silicon, so
 absolute MB/s are modest; the ratio is the meaningful signal. On this
 arithmetic/compare-bound kernel RVV wins clearly; an out-of-order RVV core would
 likely lift it further.
+
+### loong64 — measured on real Loongson 3A5000
+
+Measured on real **Loongson 3A5000** (loong64 LSX, [GCC Compile Farm](https://portal.cfarm.net/)
+cfarm401, Go 1.26.4, 2026-06-26): the LSX `MatchLen` (`VXORV` + `VMOVQ` lane→GPR
++ `CTZV`) runs at **~11.4x the scalar baseline** — a strong, measured native win
+on real Loongson silicon.
 
 ### s390x — llvm-mca cycle-model estimate
 
