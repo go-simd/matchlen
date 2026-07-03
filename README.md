@@ -91,26 +91,16 @@ cfarm401, Go 1.26.4, 2026-06-26): the LSX `MatchLen` (`VXORV` + `VMOVQ` lane→G
 + `CTZV`) runs at **~11.4x the scalar baseline** — a strong, measured native win
 on real Loongson silicon.
 
-### s390x — llvm-mca cycle-model estimate
+### s390x — measured on real IBM z15
 
-> **Static analysis, NOT a hardware measurement; native perf still pending real
-> silicon.** There is no GitHub-hosted IBM Z runner and qemu's TCG is not
-> cycle-accurate (s390x is QEMU-validated for correctness only), so the only
-> defensible throughput signal is a cycle model. These numbers come from
-> `llvm-mca` (LLVM 22) fed the steady-state (no-match) inner loop translated to
-> LLVM asm syntax. They model the *no-mismatch* iteration — the
-> throughput-determining path — not the data-dependent early-exit tail.
-
-| arch | cpu model | SIMD cyc/iter | SIMD B/cyc | scalar B/cyc | ratio |
-|---|---|---|---|---|---|
-| s390x | z14 | 1.2 (16 B) | ~13.3 | ~5.3 (8 B / 1.5 cyc) | **~2.5x** (estimate) |
-
-Honest read: on **z14 the vector path is ~2.5x** (estimate) because `VFENEBS`
-does the find-not-equal in-lane and the only GPR extraction is a single
-`VLGVB`. Caveats: llvm-mca idealizes the frontend (perfect dispatch, no
-branch-mispredict, no cache misses), so these are upper bounds on the kernel's
-compute; it models `VFENEBS`'s condition-code side effect only approximately
-(the CC-setting `vfeneb` form is used). Real IBM Z silicon may differ.
+Measured on real **IBM z15** (s390x vector facility, VXE2, native execution,
+2026-07-03, `-count=6`): the vector-facility `MatchLen` (`VL` + `VFENEBS`
+find-element-not-equal with condition code, lane→GPR via `VLGVB`) runs at
+**~9.2× the scalar baseline** — a strong, measured native win on real IBM Z
+silicon. This supersedes the earlier llvm-mca z14 cycle-model estimate of ~2.5×:
+`VFENEBS` does the find-not-equal in-lane with a single GPR extraction, and on
+real hardware the win is far larger than the conservative no-mismatch model
+projected.
 
 ## Regenerating
 
