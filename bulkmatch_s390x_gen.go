@@ -10,6 +10,7 @@
 //   - if it finds an unequal element, it sets CC=1 and writes the byte index of
 //     the first unequal element into byte 7 of the result vector;
 //   - if all 16 bytes are equal, it sets CC=3.
+//
 // We loop while CC=3 (all equal) with BVS, and on a mismatch (CC=1, BLT-taken /
 // fallthrough) extract the index with VLGVB $7.
 //
@@ -49,10 +50,10 @@ func main() {
 		Raw("ADD R1, R4, R6").
 		Raw("VL (R6), V0"). // V0 = a[i:i+16]
 		Raw("ADD R2, R4, R7").
-		Raw("VL (R7), V1").          // V1 = b[i:i+16]
-		Raw("VFENEBS V0, V1, V2").   // find first unequal byte; CC=1 found, CC=3 all-equal
-		Raw("BVS next").            // CC=3 (all equal) -> advance
-		Raw("VLGVB $7, V2, R8").    // R8 = byte index of first differing byte
+		Raw("VL (R7), V1").        // V1 = b[i:i+16]
+		Raw("VFENEBS V0, V1, V2"). // find first unequal byte; CC=1 found, CC=3 all-equal
+		Raw("BVS next").           // CC=3 (all equal) -> advance
+		Raw("VLGVB $7, V2, R8").   // R8 = byte index of first differing byte
 		Raw("ADD R4, R8, R8").
 		StoreRet("R8", "ret").
 		Raw("RET").
